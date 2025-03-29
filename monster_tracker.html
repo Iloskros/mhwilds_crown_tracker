@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Monster Tracker</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #1e2a38;
+      padding: 1rem;
+      max-width: 1000px;
+      margin: auto;
+      color: #f1f1f1;
+    }
+    h1 {
+      text-align: center;
+      font-size: 24px;
+      margin-bottom: 1rem;
+    }
+    .controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    .toggle {
+      padding: 6px 12px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #2a3b4d;
+      border-radius: 8px;
+      font-size: 14px;
+      color: #f1f1f1;
+    }
+    th, td {
+      padding: 6px 8px;
+      border-bottom: 1px solid #444c58;
+      text-align: center;
+    }
+    th {
+      background-color: #32495e;
+    }
+    tr:hover {
+      background-color: #3a4d63;
+    }
+    .monster-icon {
+      width: 36px;
+      height: 36px;
+      object-fit: contain;
+    }
+    select {
+      padding: 6px 10px;
+      font-size: 13px;
+      border-radius: 8px;
+      border: 1px solid #777;
+      text-align: center;
+      color: #f1f1f1;
+      background-color: #2e3d4e;
+    }
+    .na {
+      color: #aaa;
+      font-style: italic;
+    }
+    .crown-icon {
+      width: 24px;
+      height: 24px;
+      cursor: pointer;
+    }
+    .hidden {
+      display: none;
+    }
+    footer {
+      text-align: center;
+      margin-top: 2rem;
+      font-size: 12px;
+      color: #888;
+    }
+  </style>
+</head>
+<body>
+  <div id="captureArea">
+    <h1>Monster Hunter Wilds Crown Tracker</h1>
+
+    <div class="controls">
+      <span id="progress"></span>
+      <div>
+        <button class="toggle" id="toggleCompleted">Hide Completed</button>
+      </div>
+    </div>
+
+    <div id="trackerWrapper">
+      <table id="trackerTable">
+        <thead>
+          <tr>
+            <th></th>
+            <th>Monster</th>
+            <th>Large Crown</th>
+            <th>Small Crown</th>
+            <th>Investigation (XL)</th>
+            <th>Investigation (XS)</th>
+          </tr>
+        </thead>
+        <tbody id="trackerBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <footer>Tracker by iloskros</footer>
+
+  <script>
+    const storageKey = "monsterTrackerData";
+    const iconPath = "icons";
+    const defaultIcon = `${iconPath}/default_icon.png`;
+
+    const monsterNames = [
+      "Chatacabra", "Quematrice", "Lala Barina", "Congalala", "Balahara",
+      "Doshaguma", "Uth Duna", "Rompopolo", "Rey Dau", "Nerscylla", "Hirabami",
+      "Ajarakan", "Nu Udra", "Guardian Doshaguma", "Guardian Rathalos", "Jin Dahaad", "Guardian Ebondy Odogaron", "Xu Wu",
+      "Guardian Arkveld", "Zoh Shia", "Yian Kut-Ku", "Gypceros",
+      "Rathian", "Guardian Fulgar Anjanath", "Rathalos", "Gravios", "Blangonga",
+      "Gore Magala", "Arkveld"
+    ];
+
+    const crownless = [15,18,19];
+
+    const defaultMonsters = Array.from({ length: 29 }, (_, i) => ({
+      icon: `${iconPath}/icon${i + 1}.png`,
+      name: monsterNames[i] || `Monster ${i + 1}`,
+      crownable: !crownless.includes(i)
+    }));
+
+    let currentData = [];
+    let hideCompleted = false;
+
+    function loadData() {
+      const saved = JSON.parse(localStorage.getItem(storageKey) || "[]");
+      currentData = defaultMonsters.map((m, i) => ({
+        ...m,
+        smallCrown: saved[i]?.smallCrown || "Incomplete",
+        largeCrown: saved[i]?.largeCrown || "Incomplete",
+        invL: saved[i]?.invL || "None",
+        invS: saved[i]?.invS || "None"
+      }));
+      renderTable();
+    }
+
+    function saveData() {
+      localStorage.setItem(storageKey, JSON.stringify(currentData));
+    }
+
+    function isCompleted(entry) {
+      return entry.crownable && (entry.smallCrown === "Complete" && entry.largeCrown === "Complete");
+    }
+
+    function updateProgress() {
+      const crownable = currentData.filter(m => m.crownable);
+      const totalCrowns = crownable.length * 2;
+      const completedCrowns = crownable.reduce((acc, m) => acc + (m.smallCrown === "Complete" ? 1 : 0) + (m.largeCrown === "Complete" ? 1 : 0), 0);
+      const percent = totalCrowns === 0 ? 0 : ((completedCrowns / totalCrowns) * 100).toFixed(2);
+      document.getElementById("progress").textContent = `Progress: ${percent}% (${completedCrowns}/${totalCrowns} crowns)`;
+    }
+
+    function renderTable() {
+      const body = document.getElementById("trackerBody");
+      body.innerHTML = "";
+
+      currentData.forEach((entry, index) => {
+        const row = document.createElement("tr");
+        row.dataset.index = index;
+        if (hideCompleted && isCompleted(entry)) row.classList.add("hidden");
+
+        const largeCrown = entry.crownable
+          ? `<img src="${iconPath}/crown_large_${entry.largeCrown === 'Complete' ? 'on' : 'off'}.png" class="crown-icon crown-toggle" data-type="largeCrown" data-index="${index}">`
+          : '<span class="na">N/A</span>';
+
+        const smallCrown = entry.crownable
+          ? `<img src="${iconPath}/crown_small_${entry.smallCrown === 'Complete' ? 'on' : 'off'}.png" class="crown-icon crown-toggle" data-type="smallCrown" data-index="${index}">`
+          : '<span class="na">N/A</span>';
+
+        const invL = entry.crownable
+          ? `<select class="invL">
+              <option value="None">None</option>
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+            </select>` : '<span class="na">N/A</span>';
+
+        const invS = entry.crownable
+          ? `<select class="invS">
+              <option value="None">None</option>
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+            </select>` : '<span class="na">N/A</span>';
+
+        row.innerHTML = `
+          <td><img src="${entry.icon}" onerror="this.onerror=null;this.src='${defaultIcon}'" class="monster-icon"></td>
+          <td>${entry.name}</td>
+          <td>${largeCrown}</td>
+          <td>${smallCrown}</td>
+          <td>${invL}</td>
+          <td>${invS}</td>
+        `;
+
+        body.appendChild(row);
+      });
+
+      addListeners();
+      updateProgress();
+    }
+
+    function addListeners() {
+      document.querySelectorAll(".crown-toggle").forEach(el => {
+        el.addEventListener("click", () => {
+          const index = +el.dataset.index;
+          const type = el.dataset.type;
+          const entry = currentData[index];
+          entry[type] = entry[type] === "Complete" ? "Incomplete" : "Complete";
+          saveData();
+          renderTable();
+        });
+      });
+
+      document.querySelectorAll(".invL").forEach((el, i) => {
+        el.value = currentData[i].invL;
+        el.addEventListener("change", e => {
+          currentData[i].invL = e.target.value;
+          saveData();
+        });
+      });
+
+      document.querySelectorAll(".invS").forEach((el, i) => {
+        el.value = currentData[i].invS;
+        el.addEventListener("change", e => {
+          currentData[i].invS = e.target.value;
+          saveData();
+        });
+      });
+    }
+
+    document.getElementById("toggleCompleted").addEventListener("click", () => {
+      hideCompleted = !hideCompleted;
+      document.getElementById("toggleCompleted").textContent = hideCompleted ? "Show Completed" : "Hide Completed";
+      renderTable();
+    });
+
+    loadData();
+  </script>
+</body>
+</html>
